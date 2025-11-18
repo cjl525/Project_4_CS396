@@ -8,18 +8,24 @@
 
 #include "term_unification.h"
 
-/* Sample output (after you implement Unifier):
-Test 1 (var-const): success => {X -> a}
-Test 2 (const-var): success => {X -> b}
-Test 3 (const mismatch): failure
-Test 4 (compound match): success => {X -> a}
-Test 5 (functor mismatch): failure
-Test 6 (arity mismatch): failure
-Test 7 (occurs check): failure
-Test 8 (deep cons): success => {H -> 1, T -> cons(2, nil)}
-Test 9 (var-compound): success => {X -> g(a, Y)}
-Test 10 (two vars): success => {X -> Y}
-Test 11 (pair mismatch): failure
+/* Expected Output:
+Test 1 (var-const): X  ~  a => success {X -> a}
+Test 2 (const-var): b  ~  X => success {X -> b}
+Test 3 (const mismatch): a  ~  b => failure
+Test 4 (compound match): f(X, b)  ~  f(a, b) => success {X -> a}
+Test 5 (functor mismatch): f(X)  ~  g(X) => failure
+Test 6 (arity mismatch): f(X)  ~  f(X, Y) => failure
+Test 7 (occurs check): X  ~  f(X) => failure
+Test 8 (deep cons): cons(H, T)  ~  cons(1, cons(2, nil)) => success {H -> 1, T -> cons(2, nil)}
+Test 9 (var-compound): X  ~  g(a, Y) => success {X -> g(a, Y)}
+Test 10 (two vars): X  ~  Y => success {X -> Y}
+Test 11 (pair mismatch): pair(a, b)  ~  pair(a, c) => failure
+Test 12 (repeated var mismatch): f(X, X)  ~  f(a, b) => failure
+Test 13 (symmetric binding): f(X, Y)  ~  f(Y, a) => success {X -> a, Y -> a}
+Test 14 (occurs through alias): f(X, Y)  ~  f(Y, g(X)) => failure
+Test 15 (nested success): h(g(X), X)  ~  h(g(a), a) => success {X -> a}
+
+Summary: 15/15 outcomes matched expectations.
 */
 
 using TermPtr = std::unique_ptr<Term<std::string>>;
@@ -64,14 +70,15 @@ void printTerm(const Term<std::string>& term) {
     printTerm(term, std::cout);
 }
 
-void printSubstitution(const Unifier::Substitution& sub) {
+void printSubstitution(const Unifier& unifier, const Unifier::Substitution& sub) {
     bool first = true;
     for (const auto& [varName, term] : sub) {
         if (!first) {
             std::cout << ", ";
         }
         std::cout << varName << " -> ";
-        printTerm(*term, std::cout);
+        auto substituted = unifier.substitute(*term, sub);
+        printTerm(*substituted, std::cout);
         first = false;
     }
 }
@@ -180,6 +187,70 @@ std::vector<TestCase> buildTests() {
                          false});
     }
 
+    {
+        std::vector<TermPtr> lhsArgs;
+        lhsArgs.push_back(var("X"));
+        lhsArgs.push_back(var("X"));
+        std::vector<TermPtr> rhsArgs;
+        rhsArgs.push_back(constant("a"));
+        rhsArgs.push_back(constant("b"));
+        tests.push_back({"repeated var mismatch",
+                         compound("f", std::move(lhsArgs)),
+                         compound("f", std::move(rhsArgs)),
+                         false});
+    }
+
+    {
+        std::vector<TermPtr> lhsArgs;
+        lhsArgs.push_back(var("X"));
+        lhsArgs.push_back(var("Y"));
+        std::vector<TermPtr> rhsArgs;
+        rhsArgs.push_back(var("Y"));
+        rhsArgs.push_back(constant("a"));
+        tests.push_back({"symmetric binding",
+                         compound("f", std::move(lhsArgs)),
+                         compound("f", std::move(rhsArgs)),
+                         true});
+    }
+
+    {
+        std::vector<TermPtr> lhsArgs;
+        lhsArgs.push_back(var("X"));
+        lhsArgs.push_back(var("Y"));
+        std::vector<TermPtr> rhsArgs;
+        rhsArgs.push_back(var("Y"));
+        {
+            std::vector<TermPtr> inner;
+            inner.push_back(var("X"));
+            rhsArgs.push_back(compound("g", std::move(inner)));
+        }
+        tests.push_back({"occurs through alias",
+                         compound("f", std::move(lhsArgs)),
+                         compound("f", std::move(rhsArgs)),
+                         false});
+    }
+
+    {
+        std::vector<TermPtr> lhsArgs;
+        {
+            std::vector<TermPtr> inner;
+            inner.push_back(var("X"));
+            lhsArgs.push_back(compound("g", std::move(inner)));
+        }
+        lhsArgs.push_back(var("X"));
+        std::vector<TermPtr> rhsArgs;
+        {
+            std::vector<TermPtr> inner;
+            inner.push_back(constant("a"));
+            rhsArgs.push_back(compound("g", std::move(inner)));
+        }
+        rhsArgs.push_back(constant("a"));
+        tests.push_back({"nested success",
+                         compound("h", std::move(lhsArgs)),
+                         compound("h", std::move(rhsArgs)),
+                         true});
+    }
+
     return tests;
 }
 
@@ -199,7 +270,7 @@ int main() {
         std::cout << " => " << (success ? "success" : "failure");
         if (success && result) {
             std::cout << " {";
-            printSubstitution(*result);
+            printSubstitution(unifier, *result);
             std::cout << "}";
         }
         std::cout << "\n";
