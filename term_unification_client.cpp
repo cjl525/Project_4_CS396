@@ -1,11 +1,19 @@
+// include iostream for output
 #include <iostream>
+// include map for substitution storage
 #include <map>
+// include memory for smart pointers
 #include <memory>
+// include optional for optional results
 #include <optional>
+// include string for text handling
 #include <string>
+// include utility for move operations
 #include <utility>
+// include vector for argument lists
 #include <vector>
 
+// include unification interface definitions
 #include "term_unification.h"
 
 /* Expected Output:
@@ -28,54 +36,81 @@ Test 15 (nested success): h(g(X), X)  ~  h(g(a), a) => success {X -> a}
 Summary: 15/15 outcomes matched expectations.
 */
 
+// alias for pointer to term
 using TermPtr = std::unique_ptr<Term<std::string>>;
 
+// namespace to build convenience constructors
 namespace builders {
 
+// build a variable term
 TermPtr var(std::string name) {
+    // create variable pointer
     return std::make_unique<Variable>(std::move(name));
 }
 
+// build a constant term
 TermPtr constant(std::string value) {
+    // create constant pointer
     return std::make_unique<Constant>(std::move(value));
 }
 
+// build a compound term
 TermPtr compound(std::string functor, std::vector<TermPtr> args) {
+    // create compound pointer
     return std::make_unique<Compound<std::string>>(std::move(functor), std::move(args));
 }
 
 }  // namespace builders
 
+// print a term to a stream
 void printTerm(const Term<std::string>& term, std::ostream& out) {
+    // check variable case
     if (term.isVariable()) {
+        // cast to variable pointer
         const auto* v = dynamic_cast<const Variable*>(&term);
+        // output variable name
         out << v->name();
     } else if (term.isConstant()) {
+        // cast to constant pointer
         const auto* c = dynamic_cast<const Constant*>(&term);
+        // output constant value
         out << c->value();
     } else if (term.isCompound()) {
+        // cast to compound pointer
         const auto* comp = dynamic_cast<const Compound<std::string>*>(&term);
+        // print functor and opening parenthesis
         out << comp->functor() << "(";
+        // iterate over arguments
         for (std::size_t i = 0; i < comp->arity(); ++i) {
+            // add comma separator for subsequent args
             if (i > 0) {
+                // print separator
                 out << ", ";
             }
+            // recursively print argument
             printTerm(comp->arg(i), out);
         }
+        // close compound representation
         out << ")";
     }
 }
 
+// convenience overload to print to cout
 void printTerm(const Term<std::string>& term) {
+    // delegate to stream overload
     printTerm(term, std::cout);
 }
 
 void printSubstitution(const Unifier& unifier, const Unifier::Substitution& sub) {
     bool first = true;
+    // iterate over substitution entries
     for (const auto& [varName, term] : sub) {
+        // add comma when not first
         if (!first) {
+            // print comma separator
             std::cout << ", ";
         }
+        // print variable arrow
         std::cout << varName << " -> ";
         auto substituted = unifier.substitute(*term, sub);
         printTerm(*substituted, std::cout);
@@ -83,28 +118,46 @@ void printSubstitution(const Unifier& unifier, const Unifier::Substitution& sub)
     }
 }
 
+// define test case structure
 struct TestCase {
+    // descriptive name
     std::string name;
+    // first term pointer
     TermPtr t1;
+    // second term pointer
     TermPtr t2;
+    // expected success flag
     bool expectSuccess;
 };
 
+// build the collection of test cases
 std::vector<TestCase> buildTests() {
+    // use builder helpers
     using namespace builders;
+    // container for tests
     std::vector<TestCase> tests;
 
+    // add variable to constant test
     tests.push_back({"var-const", var("X"), constant("a"), true});
+    // add constant to variable test
     tests.push_back({"const-var", constant("b"), var("X"), true});
+    // add mismatch constant test
     tests.push_back({"const mismatch", constant("a"), constant("b"), false});
 
     {
+        // prepare left and right compound arguments
         std::vector<TermPtr> lhsArgs;
+        // push variable X
         lhsArgs.push_back(var("X"));
+        // push constant b
         lhsArgs.push_back(constant("b"));
+        // prepare right arguments
         std::vector<TermPtr> rhsArgs;
+        // push constant a
         rhsArgs.push_back(constant("a"));
+        // push constant b
         rhsArgs.push_back(constant("b"));
+        // add compound match test
         tests.push_back({"compound match",
                          compound("f", std::move(lhsArgs)),
                          compound("f", std::move(rhsArgs)),
@@ -112,10 +165,15 @@ std::vector<TestCase> buildTests() {
     }
 
     {
+        // prepare functor mismatch case
         std::vector<TermPtr> lhsArgs;
+        // push variable X
         lhsArgs.push_back(var("X"));
+        // prepare right arguments
         std::vector<TermPtr> rhsArgs;
+        // push variable X
         rhsArgs.push_back(var("X"));
+        // add mismatch test
         tests.push_back({"functor mismatch",
                          compound("f", std::move(lhsArgs)),
                          compound("g", std::move(rhsArgs)),
@@ -123,11 +181,17 @@ std::vector<TestCase> buildTests() {
     }
 
     {
+        // prepare arity mismatch case
         std::vector<TermPtr> lhsArgs;
+        // push variable X
         lhsArgs.push_back(var("X"));
+        // prepare right arguments
         std::vector<TermPtr> rhsArgs;
+        // push variable X
         rhsArgs.push_back(var("X"));
+        // push variable Y
         rhsArgs.push_back(var("Y"));
+        // add arity mismatch test
         tests.push_back({"arity mismatch",
                          compound("f", std::move(lhsArgs)),
                          compound("f", std::move(rhsArgs)),
@@ -135,8 +199,11 @@ std::vector<TestCase> buildTests() {
     }
 
     {
+        // prepare occurs check case
         std::vector<TermPtr> rhsArgs;
+        // push variable X
         rhsArgs.push_back(var("X"));
+        // add occurs check test
         tests.push_back({"occurs check",
                          var("X"),
                          compound("f", std::move(rhsArgs)),
@@ -144,17 +211,26 @@ std::vector<TestCase> buildTests() {
     }
 
     {
-        // cons(H, T) vs cons(1, cons(2, nil))
+        // prepare cons structure test
         std::vector<TermPtr> lhsArgs;
+        // push head variable
         lhsArgs.push_back(var("H"));
+        // push tail variable
         lhsArgs.push_back(var("T"));
 
+        // inner list arguments
         std::vector<TermPtr> innerArgs;
+        // push element 2
         innerArgs.push_back(constant("2"));
+        // push nil terminator
         innerArgs.push_back(constant("nil"));
+        // build right-hand side arguments
         std::vector<TermPtr> rhsArgs;
+        // push head constant 1
         rhsArgs.push_back(constant("1"));
+        // push constructed tail
         rhsArgs.push_back(compound("cons", std::move(innerArgs)));
+        // add deep cons test
         tests.push_back({"deep cons",
                          compound("cons", std::move(lhsArgs)),
                          compound("cons", std::move(rhsArgs)),
@@ -162,25 +238,36 @@ std::vector<TestCase> buildTests() {
     }
 
     {
-        // X vs g(a, Y)
+        // build variable versus compound case
         std::vector<TermPtr> rhsArgs;
+        // push constant a
         rhsArgs.push_back(constant("a"));
+        // push variable y
         rhsArgs.push_back(var("Y"));
+        // add var-compound test
         tests.push_back(
             {"var-compound", var("X"), compound("g", std::move(rhsArgs)), true});
     }
 
     {
+        // add two variables binding test
         tests.push_back({"two vars", var("X"), var("Y"), true});
     }
 
     {
+        // prepare pair mismatch
         std::vector<TermPtr> lhsArgs;
+        // push constant a
         lhsArgs.push_back(constant("a"));
+        // push constant b
         lhsArgs.push_back(constant("b"));
+        // prepare right arguments
         std::vector<TermPtr> rhsArgs;
+        // push constant a
         rhsArgs.push_back(constant("a"));
+        // push constant c
         rhsArgs.push_back(constant("c"));
+        // add pair mismatch test
         tests.push_back({"pair mismatch",
                          compound("pair", std::move(lhsArgs)),
                          compound("pair", std::move(rhsArgs)),
@@ -254,30 +341,49 @@ std::vector<TestCase> buildTests() {
     return tests;
 }
 
+// program entry point
 int main() {
+    // create unifier instance
     Unifier unifier;
+    // build all tests
     auto tests = buildTests();
 
+    // track passed count
     int passed = 0;
+    // iterate through tests
     for (std::size_t i = 0; i < tests.size(); ++i) {
+        // reference current test
         const auto& test = tests[i];
+        // attempt unification
         auto result = unifier.unify(*test.t1, *test.t2);
+        // determine success flag
         bool success = result.has_value();
+        // print test header
         std::cout << "Test " << (i + 1) << " (" << test.name << "): ";
+        // print left term
         printTerm(*test.t1);
+        // print separator
         std::cout << "  ~  ";
+        // print right term
         printTerm(*test.t2);
+        // output result state
         std::cout << " => " << (success ? "success" : "failure");
+        // if success print substitution
         if (success && result) {
+            // open brace
             std::cout << " {";
             printSubstitution(unifier, *result);
             std::cout << "}";
         }
+        // end line
         std::cout << "\n";
+        // tally pass or fail
         passed += (success == test.expectSuccess) ? 1 : 0;
     }
 
+    // print summary line
     std::cout << "Summary: " << passed << "/" << tests.size()
               << " outcomes matched expectations.\n";
+    // return success code
     return 0;
 }

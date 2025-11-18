@@ -1,18 +1,25 @@
+// include header for term interfaces
 #include "term_unification.h"
 
+// include standard exception header
 #include <stdexcept>
 
 std::optional<Unifier::Substitution> Unifier::unify(const Term<std::string>& t1,
                                                     const Term<std::string>& t2) {
+    // create a working substitution map
     Substitution working;
+    // attempt to unify internally and check for failure
     if (!unifyInternal(t1, t2, working)) {
+        // return no value on failure
         return std::nullopt;
     }
+    // return successful substitution
     return working;
 }
 
 std::unique_ptr<Term<std::string>> Unifier::substitute(const Term<std::string>& term,
                                                        const Substitution& sub) const {
+    // delegate to cloneWithSubstitution to apply bindings
     return cloneWithSubstitution(term, sub);
 }
 
