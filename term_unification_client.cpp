@@ -36,12 +36,6 @@ Test 15 (nested success): h(g(X), X)  ~  h(g(a), a) => success {X -> a}
 Summary: 15/15 outcomes matched expectations.
 */
 
-/* design notes:
-each test uses small builder helpers to reduce boilerplate when constructing variables, constants, and compounds.
-the pretty-printer resolves substitutions through the unifier so aliased variables display their final bindings.
-occurs checks run through existing bindings before accepting any variable match, and all bindings are cloned via unique_ptr to avoid aliasing while keeping ownership clear.
-the expanded suite stresses commutativity, occurs checking, and deep nesting to mirror the assignment rubric. */
-
 // alias for pointer to term
 using TermPtr = std::unique_ptr<Term<std::string>>;
 
@@ -107,9 +101,7 @@ void printTerm(const Term<std::string>& term) {
     printTerm(term, std::cout);
 }
 
-// print a substitution map
 void printSubstitution(const Unifier& unifier, const Unifier::Substitution& sub) {
-    // track whether first element printed
     bool first = true;
     // iterate over substitution entries
     for (const auto& [varName, term] : sub) {
@@ -120,11 +112,8 @@ void printSubstitution(const Unifier& unifier, const Unifier::Substitution& sub)
         }
         // print variable arrow
         std::cout << varName << " -> ";
-        // apply substitution for readability
         auto substituted = unifier.substitute(*term, sub);
-        // print resolved term
         printTerm(*substituted, std::cout);
-        // mark first as handled
         first = false;
     }
 }
@@ -286,19 +275,12 @@ std::vector<TestCase> buildTests() {
     }
 
     {
-        // prepare repeated variable mismatch
         std::vector<TermPtr> lhsArgs;
-        // push variable x
         lhsArgs.push_back(var("X"));
-        // push variable x again
         lhsArgs.push_back(var("X"));
-        // prepare right arguments
         std::vector<TermPtr> rhsArgs;
-        // push constant a
         rhsArgs.push_back(constant("a"));
-        // push constant b
         rhsArgs.push_back(constant("b"));
-        // add repeated var test
         tests.push_back({"repeated var mismatch",
                          compound("f", std::move(lhsArgs)),
                          compound("f", std::move(rhsArgs)),
@@ -306,19 +288,12 @@ std::vector<TestCase> buildTests() {
     }
 
     {
-        // prepare symmetric binding test
         std::vector<TermPtr> lhsArgs;
-        // push variable x
         lhsArgs.push_back(var("X"));
-        // push variable y
         lhsArgs.push_back(var("Y"));
-        // prepare right arguments
         std::vector<TermPtr> rhsArgs;
-        // push variable y
         rhsArgs.push_back(var("Y"));
-        // push constant a
         rhsArgs.push_back(constant("a"));
-        // add symmetric binding test
         tests.push_back({"symmetric binding",
                          compound("f", std::move(lhsArgs)),
                          compound("f", std::move(rhsArgs)),
@@ -326,25 +301,16 @@ std::vector<TestCase> buildTests() {
     }
 
     {
-        // prepare occurs through alias test
         std::vector<TermPtr> lhsArgs;
-        // push variable x
         lhsArgs.push_back(var("X"));
-        // push variable y
         lhsArgs.push_back(var("Y"));
-        // prepare right arguments
         std::vector<TermPtr> rhsArgs;
-        // push variable y
         rhsArgs.push_back(var("Y"));
         {
-            // prepare inner compound
             std::vector<TermPtr> inner;
-            // push variable x
             inner.push_back(var("X"));
-            // push compound g(x)
             rhsArgs.push_back(compound("g", std::move(inner)));
         }
-        // add occurs through alias test
         tests.push_back({"occurs through alias",
                          compound("f", std::move(lhsArgs)),
                          compound("f", std::move(rhsArgs)),
@@ -352,38 +318,26 @@ std::vector<TestCase> buildTests() {
     }
 
     {
-        // prepare nested success test
         std::vector<TermPtr> lhsArgs;
         {
-            // inner compound on left
             std::vector<TermPtr> inner;
-            // push variable x
             inner.push_back(var("X"));
-            // add compound g(x)
             lhsArgs.push_back(compound("g", std::move(inner)));
         }
-        // push second argument x
         lhsArgs.push_back(var("X"));
-        // prepare right arguments
         std::vector<TermPtr> rhsArgs;
         {
-            // inner compound on right
             std::vector<TermPtr> inner;
-            // push constant a
             inner.push_back(constant("a"));
-            // add compound g(a)
             rhsArgs.push_back(compound("g", std::move(inner)));
         }
-        // push second argument a
         rhsArgs.push_back(constant("a"));
-        // add nested success test
         tests.push_back({"nested success",
                          compound("h", std::move(lhsArgs)),
                          compound("h", std::move(rhsArgs)),
                          true});
     }
 
-    // return finished test list
     return tests;
 }
 
@@ -418,9 +372,7 @@ int main() {
         if (success && result) {
             // open brace
             std::cout << " {";
-            // print substitution mapping
             printSubstitution(unifier, *result);
-            // close brace
             std::cout << "}";
         }
         // end line
