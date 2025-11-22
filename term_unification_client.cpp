@@ -1,19 +1,10 @@
-// include iostream for output
 #include <iostream>
-// include map for substitution storage
 #include <map>
-// include memory for smart pointers
 #include <memory>
-// include optional for optional results
 #include <optional>
-// include string for text handling
 #include <string>
-// include utility for move operations
 #include <utility>
-// include vector for argument lists
 #include <vector>
-
-// include unification interface definitions
 #include "term_unification.h"
 
 /* Expected Output:
