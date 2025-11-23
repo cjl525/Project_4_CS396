@@ -1,27 +1,31 @@
-// include header for term interfaces
 #include "term_unification.h"
 
-// include standard exception header
 #include <stdexcept>
+
+// TODO: Implement full unification logic with occurs check.
 
 std::optional<Unifier::Substitution> Unifier::unify(const Term<std::string>& t1,
                                                     const Term<std::string>& t2) {
-    // create a working substitution map
+    // create a working sub map
     Substitution working;
     // attempt to unify internally and check for failure
     if (!unifyInternal(t1, t2, working)) {
         // return no value on failure
         return std::nullopt;
     }
-    // return successful substitution
+    // return successful sub
     return working;
 }
 
+// TODO: Apply substitutions recursively to produce a fully bound deep copy.
+
 std::unique_ptr<Term<std::string>> Unifier::substitute(const Term<std::string>& term,
                                                        const Substitution& sub) const {
-    // delegate to cloneWithSubstitution to apply bindings
+    // apply the bindings
     return cloneWithSubstitution(term, sub);
 }
+
+// TODO: Implement occurs check to prevent circular bindings.
 
 bool Unifier::occurs(const std::string& varName,
                      const Term<std::string>& term,
@@ -51,6 +55,8 @@ bool Unifier::occurs(const std::string& varName,
     return false;
 }
 
+// TODO: Clone a term while applying the provided substitution map.
+
 std::unique_ptr<Term<std::string>> Unifier::cloneWithSubstitution(
     const Term<std::string>& term, const Substitution& sub) const {
     if (term.isVariable()) {
@@ -76,24 +82,26 @@ std::unique_ptr<Term<std::string>> Unifier::cloneWithSubstitution(
     return std::make_unique<Compound<std::string>>(comp->functor(), std::move(clonedArgs));
 }
 
+// TODO: Recursive unification helper. Mutates working substitution on success.
+
 bool Unifier::unifyInternal(const Term<std::string>& a,
                             const Term<std::string>& b,
                             Substitution& working) {
-    // Apply current substitutions to both terms to work with their most-reduced forms.
+    //current substitutions to both terms to work with their reduced forms.
     auto aReduced = cloneWithSubstitution(a, working);
     auto bReduced = cloneWithSubstitution(b, working);
 
     const Term<std::string>& lhs = *aReduced;
     const Term<std::string>& rhs = *bReduced;
 
-    // Variable cases
+    // the variable cases
     if (lhs.isVariable() && rhs.isVariable()) {
         const auto* lv = dynamic_cast<const Variable*>(&lhs);
         const auto* rv = dynamic_cast<const Variable*>(&rhs);
         if (lv->name() == rv->name()) {
             return true;
         }
-        // Deterministic binding: bind lexicographically smaller variable to the other.
+        // bind lexicographically smaller variable to other
         const auto* first = (lv->name() < rv->name()) ? lv : rv;
         const auto* second = (first == lv) ? rv : lv;
         working[first->name()] = std::make_unique<Variable>(second->name());
@@ -118,14 +126,14 @@ bool Unifier::unifyInternal(const Term<std::string>& a,
         return true;
     }
 
-    // Constant case
+    // the const case
     if (lhs.isConstant() && rhs.isConstant()) {
         const auto* lc = dynamic_cast<const Constant*>(&lhs);
         const auto* rc = dynamic_cast<const Constant*>(&rhs);
         return lc->value() == rc->value();
     }
 
-    // Compound case
+    // compound case
     if (lhs.isCompound() && rhs.isCompound()) {
         const auto* lc = dynamic_cast<const Compound<std::string>*>(&lhs);
         const auto* rc = dynamic_cast<const Compound<std::string>*>(&rhs);
